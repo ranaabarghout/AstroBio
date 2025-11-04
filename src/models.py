@@ -230,5 +230,5 @@ class SparseAutoencoder(nn.Module):
         """
         recon_loss = self.get_reconstruction_loss(x, reconstructed)
         sparsity_loss = self.get_sparsity_loss(features)
-        return recon_loss + sparsity_weight * sparsity_loss
+        return recon_loss, sparsity_loss, recon_loss + sparsity_weight * sparsity_loss
 
