@@ -112,11 +112,11 @@ def get_expression_data(soma_joinids, census_version=CENSUS_VERSION):
         )
 
     logger.info(f"Retrieved expression data: {adata.shape[0]} cells x {adata.shape[1]} genes")
-    
+
     if adata.shape[0] == 0:
         logger.error("No expression data retrieved! This might indicate an issue with soma_joinid filtering.")
         logger.info(f"Sample soma_joinids requested: {sorted_joinids[:10]}")
-    
+
     return adata
 
 
@@ -325,7 +325,7 @@ def main():
     # Check if we got any data
     if adata.shape[0] == 0:
         logger.error("No expression data retrieved. Trying alternative approach...")
-        
+
         # Try getting data without specific soma_joinid filtering
         with cellxgene_census.open_soma(census_version=CENSUS_VERSION) as census:
             adata = cellxgene_census.get_anndata(
@@ -336,9 +336,9 @@ def main():
                 var_value_filter="feature_id != ''",
                 column_names=METADATA_FIELDS
             )
-            
+
         logger.info(f"Alternative retrieval: {adata.shape[0]} cells x {adata.shape[1]} genes")
-        
+
         # If we still have too many cells, subsample
         if adata.shape[0] > args.target_cells * 2:
             logger.info(f"Subsampling expression data to {args.target_cells * 2} cells...")
@@ -348,7 +348,7 @@ def main():
 
     # Step 3: Add metadata to adata.obs (metadata should already be included)
     logger.info("Checking metadata integration...")
-    
+
     # Check if metadata columns are already present
     missing_cols = [col for col in METADATA_FIELDS if col not in adata.obs.columns and col != "soma_joinid"]
     if missing_cols:
@@ -356,7 +356,7 @@ def main():
         # If metadata is missing, merge it
         metadata_indexed = metadata.set_index("soma_joinid")
         common_cells = adata.obs.index.intersection(metadata_indexed.index)
-        
+
         if len(common_cells) == 0:
             logger.warning("No common cells found between metadata and expression data!")
             # Use adata as is, it should have metadata from get_anndata
@@ -367,7 +367,7 @@ def main():
                     adata.obs[col] = metadata_indexed.loc[adata.obs.index, col]
 
     logger.info(f"Final dataset: {adata.shape[0]} cells x {adata.shape[1]} genes")
-    
+
     # Early exit if no cells
     if adata.shape[0] == 0:
         logger.error("No cells remaining after data retrieval and filtering!")
