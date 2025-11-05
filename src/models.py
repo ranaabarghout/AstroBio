@@ -116,7 +116,7 @@ class SparseAutoencoder(nn.Module):
                 decoder_layers.append(nn.Linear(hidden_dim, hidden_dim, bias=False))
                 if i < n_decoder_layers - 2:  # Don't add ReLU after last layer
                     decoder_layers.append(nn.ReLU())
-        decoder_layers.append(nn.Linear(hidden_dim, input_dim, bias=False))
+            decoder_layers.append(nn.Linear(hidden_dim, input_dim, bias=False))
         self.decoder = nn.Sequential(*decoder_layers)
 
 
