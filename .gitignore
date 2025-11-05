@@ -209,6 +209,6 @@ __marimo__/
 
 # Not important
 notebooks/explore_cellxgene_data.ipynb
-docs
 data/raw/
 data/processed/
+scripts/run_example.py
