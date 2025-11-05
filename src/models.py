@@ -10,7 +10,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-
+import matplotlib.pyplot as plt
+from torch.optim import Adam
+from torch.utils.data import DataLoader
 
 class SimpleSparseAutoencoder(nn.Module):
     def __init__(self, d_in, d_hidden):
@@ -231,4 +233,164 @@ class SparseAutoencoder(nn.Module):
         recon_loss = self.get_reconstruction_loss(x, reconstructed)
         sparsity_loss = self.get_sparsity_loss(features)
         return recon_loss, sparsity_loss, recon_loss + sparsity_weight * sparsity_loss
+
+
+    def train_model(self, train_loader: DataLoader, test_loader: DataLoader, n_epochs: int = 1, lr: float = 1e-3, sparsity_weight: float = 1e-2, 
+                    device: torch.device | None = None, plot_losses: bool = True) -> dict:
+        """
+        Train the sparse autoencoder model and track training/test losses per epoch.
+        
+        Parameters
+        ----------
+        train_loader : torch.utils.data.DataLoader
+            Training data loader.
+        test_loader : torch.utils.data.DataLoader
+            Test data loader.
+        n_epochs : int, default=1
+            Number of training epochs.
+        lr : float, default=1e-3
+            Learning rate for optimizer.
+        sparsity_weight : float, default=1e-2
+            Weight for sparsity loss.
+        device : torch.device, optional
+            Device to train on. If None, will use CUDA if available, else CPU.
+        plot_losses : bool, default=True
+            Plot losses per epoch.
+        
+        Returns
+        -------
+        dict
+            Dictionary containing lists of epoch-level mean losses:
+            - train_recon_loss: Mean training reconstruction losses per epoch
+            - train_sparsity_loss: Mean training sparsity losses per epoch
+            - train_total_loss: Mean training total losses per epoch
+            - test_recon_loss: Mean test reconstruction losses per epoch
+            - test_sparsity_loss: Mean test sparsity losses per epoch
+            - test_total_loss: Mean test total losses per epoch
+            - epochs: Epoch numbers
+        """
+        if device is None:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+        optimizer = Adam(self.parameters(), lr=lr)
+        self.to(device)
+        
+        # Initialize epoch-level loss tracking lists
+        train_recon_losses = []
+        train_sparsity_losses = []
+        train_total_losses = []
+        test_recon_losses = []
+        test_sparsity_losses = []
+        test_total_losses = []
+        epochs = []
+        
+        self.train()
+        for i_epoch in range(n_epochs):
+            # Track losses for this epoch
+            epoch_train_recon = []
+            epoch_train_sparsity = []
+            epoch_train_total = []
+            
+            # Training phase
+            for i_step, d in enumerate(train_loader):
+                d = d.to(device)
+                optimizer.zero_grad()
+                recon, embed = self(d)
+                recon_loss, sparsity_loss, total_loss = self.get_total_loss(
+                    d, recon, embed, sparsity_weight=sparsity_weight
+                )
+                total_loss.backward()
+                optimizer.step()
+                
+                # Collect training losses for this epoch
+                epoch_train_recon.append(recon_loss.item())
+                epoch_train_sparsity.append(sparsity_loss.item())
+                epoch_train_total.append(total_loss.item())
+                
+            # Compute mean training losses for this epoch
+            avg_train_recon = sum(epoch_train_recon) / len(epoch_train_recon)
+            avg_train_sparsity = sum(epoch_train_sparsity) / len(epoch_train_sparsity)
+            avg_train_total = sum(epoch_train_total) / len(epoch_train_total)
+            
+            train_recon_losses.append(avg_train_recon)
+            train_sparsity_losses.append(avg_train_sparsity)
+            train_total_losses.append(avg_train_total)
+            
+            # Evaluate on test set after each epoch
+            self.eval()
+            test_recon_loss_epoch = []
+            test_sparsity_loss_epoch = []
+            test_total_loss_epoch = []
+            
+            with torch.no_grad():
+                for test_d in test_loader:
+                    test_d = test_d.to(device)
+                    test_recon, test_embed = self(test_d)
+                    test_recon_loss, test_sparsity_loss, test_total_loss = self.get_total_loss(
+                        test_d, test_recon, test_embed, sparsity_weight=sparsity_weight
+                    )
+                    test_recon_loss_epoch.append(test_recon_loss.item())
+                    test_sparsity_loss_epoch.append(test_sparsity_loss.item())
+                    test_total_loss_epoch.append(test_total_loss.item())
+            
+            # Average test losses for this epoch
+            avg_test_recon = sum(test_recon_loss_epoch) / len(test_recon_loss_epoch)
+            avg_test_sparsity = sum(test_sparsity_loss_epoch) / len(test_sparsity_loss_epoch)
+            avg_test_total = sum(test_total_loss_epoch) / len(test_total_loss_epoch)
+            
+            test_recon_losses.append(avg_test_recon)
+            test_sparsity_losses.append(avg_test_sparsity)
+            test_total_losses.append(avg_test_total)
+            epochs.append(i_epoch)
+            
+            print(f"\nEpoch {i_epoch} Summary:")
+            print(f"  Train - Total: {avg_train_total:.4f}, Recon: {avg_train_recon:.4f}, Sparsity: {avg_train_sparsity:.4f}")
+            print(f"  Test  - Total: {avg_test_total:.4f}, Recon: {avg_test_recon:.4f}, Sparsity: {avg_test_sparsity:.4f}\n")
+            
+            self.train()
+        
+        # Plot losses per epoch
+        if plot_losses:
+            fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+            
+            # Plot reconstruction loss
+            axes[0].plot(epochs, train_recon_losses, label='Train Recon Loss', marker='o', markersize=6)
+            axes[0].plot(epochs, test_recon_losses, label='Test Recon Loss', marker='s', markersize=6)
+            axes[0].set_xlabel('Epoch')
+            axes[0].set_ylabel('Reconstruction Loss')
+            axes[0].set_title('Reconstruction Loss')
+            axes[0].legend()
+            axes[0].grid(True, alpha=0.3)
+            
+            # Plot sparsity loss
+            axes[1].plot(epochs, train_sparsity_losses, label='Train Sparsity Loss', marker='o', markersize=6)
+            axes[1].plot(epochs, test_sparsity_losses, label='Test Sparsity Loss', marker='s', markersize=6)
+            axes[1].set_xlabel('Epoch')
+            axes[1].set_ylabel('Sparsity Loss')
+            axes[1].set_title('Sparsity Loss')
+            axes[1].legend()
+            axes[1].grid(True, alpha=0.3)
+            
+            # Plot total loss
+            axes[2].plot(epochs, train_total_losses, label='Train Total Loss', marker='o', markersize=6)
+            axes[2].plot(epochs, test_total_losses, label='Test Total Loss', marker='s', markersize=6)
+            axes[2].set_xlabel('Epoch')
+            axes[2].set_ylabel('Total Loss')
+            axes[2].set_title('Total Loss')
+            axes[2].legend()
+            axes[2].grid(True, alpha=0.3)
+            
+            plt.tight_layout()
+            plt.show()
+        
+        
+        return {
+            'train_recon_loss': train_recon_losses,
+            'train_sparsity_loss': train_sparsity_losses,
+            'train_total_loss': train_total_losses,
+            'test_recon_loss': test_recon_losses,
+            'test_sparsity_loss': test_sparsity_losses,
+            'test_total_loss': test_total_losses,
+            'epochs': epochs
+        }
 
