@@ -13,6 +13,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from torch.optim import Adam
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 class SimpleSparseAutoencoder(nn.Module):
     def __init__(self, d_in, d_hidden):
@@ -285,7 +286,8 @@ class SparseAutoencoder(nn.Module):
         epochs = []
         
         self.train()
-        for i_epoch in range(n_epochs):
+        pbar = tqdm(range(n_epochs), desc="Training")
+        for i_epoch in pbar:
             # Track losses for this epoch
             epoch_train_recon = []
             epoch_train_sparsity = []
@@ -343,9 +345,13 @@ class SparseAutoencoder(nn.Module):
             test_total_losses.append(avg_test_total)
             epochs.append(i_epoch)
             
-            print(f"\nEpoch {i_epoch} Summary:")
-            print(f"  Train - Total: {avg_train_total:.4f}, Recon: {avg_train_recon:.4f}, Sparsity: {avg_train_sparsity:.4f}")
-            print(f"  Test  - Total: {avg_test_total:.4f}, Recon: {avg_test_recon:.4f}, Sparsity: {avg_test_sparsity:.4f}\n")
+            # Update progress bar with loss information
+            pbar.set_postfix({
+                'Train Loss': f'{avg_train_total:.4f}',
+                'Test Loss': f'{avg_test_total:.4f}',
+                'Train Recon': f'{avg_train_recon:.4f}',
+                'Test Recon': f'{avg_test_recon:.4f}'
+            })
             
             self.train()
         
