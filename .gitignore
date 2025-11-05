@@ -212,3 +212,5 @@ notebooks/explore_cellxgene_data.ipynb
 data/raw/
 data/processed/
 scripts/run_example.py
+
+data/*
