@@ -16,6 +16,7 @@ import json
 import logging
 from pathlib import Path
 import sys
+import warnings
 
 import cellxgene_census
 import gseapy as gp
@@ -34,6 +35,9 @@ from models import SparseAutoencoder
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Suppress scipy warnings about constant arrays
+warnings.filterwarnings("ignore", message="An input array is constant")
 
 # Configuration
 ORGANISM = "homo_sapiens"
@@ -119,6 +123,7 @@ def load_sae_model(model_dir="models"):
 def extract_sae_features(embeddings, model):
     """
     Extract SAE latent features from input embeddings.
+    Uses the full forward pass to get the proper sparse features.
     """
     logger.info("Extracting SAE latent features...")
 
@@ -128,13 +133,11 @@ def extract_sae_features(embeddings, model):
         # Convert to tensor
         embeddings_tensor = torch.FloatTensor(embeddings)
 
-        # Get latent features (encoder output)
-        latent_features = model.encoder(embeddings_tensor)
+        # Use the full forward pass to get the sparse features
+        # The forward method returns (reconstructed, features) where features is the sparse representation
+        reconstructed, sparse_features = model(embeddings_tensor)
 
-        # Apply ReLU activation (sparsity)
-        latent_features = torch.relu(latent_features)
-
-    features = latent_features.numpy()
+    features = sparse_features.numpy()
     sparsity = (features == 0).mean()
 
     logger.info(f"SAE features shape: {features.shape}")
@@ -311,16 +314,88 @@ def prepare_comprehensive_attributions(adata):
         'continuous': {attr: adata.obs[attr] for attr in continuous_attrs}
     }
 
-    # Create confounders for residualization (technical factors)
+    # Create confounders for residualization (technical factors only - keep numeric)
     confounder_cols = ['n_counts', 'n_genes']
+    confounders = adata.obs[confounder_cols].copy()
+
+    # Add a few top dataset dummies if we have multiple datasets, but limit to avoid overfitting
     if 'dataset_id' in adata.obs.columns:
-        # One-hot encode dataset_id for batch effect control
-        dataset_dummies = pd.get_dummies(adata.obs['dataset_id'], prefix='dataset')
-        confounders = pd.concat([adata.obs[confounder_cols], dataset_dummies], axis=1)
-    else:
-        confounders = adata.obs[confounder_cols]
+        top_datasets = adata.obs['dataset_id'].value_counts().head(10).index  # Top 10 datasets
+        for dataset in top_datasets:
+            confounders[f'dataset_{dataset}'] = (adata.obs['dataset_id'] == dataset).astype(int)
+
+    # Ensure all confounders are numeric
+    confounders = confounders.select_dtypes(include=[np.number])
 
     return attributions, confounders
+
+
+def check_existing_results(output_dir):
+    """
+    Check if analysis results already exist in the output directory.
+
+    Returns:
+        bool: True if results exist and are complete, False otherwise
+    """
+    output_path = Path(output_dir)
+
+    # Check if output directory exists
+    if not output_path.exists():
+        return False
+
+    # Check for key result files
+    required_files = [
+        'sae_features.npy',
+        'analysis_results.json',
+        'cell_metadata.csv',
+        'summary_report.txt'
+    ]
+
+    for file in required_files:
+        if not (output_path / file).exists():
+            logger.info(f"Missing result file: {file}")
+            return False
+
+    # Check if analysis_results.json has meaningful content
+    try:
+        with open(output_path / 'analysis_results.json', 'r') as f:
+            results = json.load(f)
+
+        # Basic validation - check if we have the main analysis sections
+        if 'data_info' not in results or 'univariate' not in results:
+            logger.info("Incomplete analysis results found")
+            return False
+
+        logger.info(f"Complete analysis results found in {output_dir}")
+        return True
+
+    except (json.JSONDecodeError, FileNotFoundError):
+        logger.info("Invalid or missing analysis results file")
+        return False
+
+
+def load_existing_results(output_dir):
+    """
+    Load existing analysis results from the output directory.
+
+    Returns:
+        tuple: (results, sae_features, summary_text)
+    """
+    output_path = Path(output_dir)
+
+    # Load analysis results
+    with open(output_path / 'analysis_results.json', 'r') as f:
+        results = json.load(f)
+
+    # Load SAE features
+    sae_features = np.load(output_path / 'sae_features.npy')
+
+    # Load summary report
+    with open(output_path / 'summary_report.txt', 'r') as f:
+        summary_text = f.read()
+
+    logger.info(f"Loaded existing results from {output_dir}")
+    return results, sae_features, summary_text
 
 
 def save_results(results, sae_features, adata, output_dir):
@@ -342,6 +417,8 @@ def save_results(results, sae_features, adata, output_dir):
             return int(obj)
         elif isinstance(obj, np.floating):
             return float(obj)
+        elif isinstance(obj, np.bool_):
+            return bool(obj)
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
         elif isinstance(obj, dict):
@@ -427,6 +504,8 @@ def main():
                        help="Output directory for results")
     parser.add_argument("--census-version", type=str, default=CENSUS_VERSION,
                        help="CellxGene Census version")
+    parser.add_argument("--force", action="store_true",
+                       help="Force rerun even if results already exist")
 
     args = parser.parse_args()
 
@@ -438,6 +517,25 @@ def main():
     logger.info(f"Sample size: {args.sample_size}")
     logger.info(f"Model directory: {args.model_dir}")
     logger.info(f"Output directory: {args.output_dir}")
+
+    # Check if results already exist (unless --force is specified)
+    if not args.force and check_existing_results(args.output_dir):
+        logger.info("⚡ Results already exist! Loading existing analysis...")
+        logger.info("💡 Use --force flag to rerun the analysis from scratch")
+
+        try:
+            results, sae_features, summary_text = load_existing_results(args.output_dir)
+
+            logger.info("✅ Successfully loaded existing results!")
+            print("\n" + summary_text)
+            return
+
+        except Exception as e:
+            logger.warning(f"Failed to load existing results: {e}")
+            logger.info("🔄 Running fresh analysis...")
+
+    elif args.force:
+        logger.info("🔄 Force flag specified - running fresh analysis...")
 
     try:
         # Step 1: Load data from CellxGene Census

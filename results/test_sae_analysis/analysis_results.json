@@ -1,0 +1,23 @@
+{
+  "data_info": {
+    "n_cells": 1000,
+    "n_features": 5120,
+    "n_binary_attrs": 0,
+    "n_categorical_attrs": 9,
+    "n_continuous_attrs": 11,
+    "has_confounders": true
+  },
+  "univariate": {
+    "binary": {},
+    "categorical": {
+      "assay": [
+        {
+          "feature_idx": 0,
+          "kruskal_wallis_stat": 116.43683255891318,
+          "kruskal_wallis_p": 5.20071511573396e-26,
+          "eta_squared": 0.00016166732530109584,
+          "effect_size": 0.00016166732530109584,
+          "statistic": 116.43683255891318,
+          "p_value": 5.20071511573396e-26,
+          "q_value": 1.0593857725306495e-24,
+          "significant": 

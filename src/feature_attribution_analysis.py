@@ -12,6 +12,7 @@ Functions:
 """
 
 import logging
+import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -420,16 +421,24 @@ class FeatureAttributionAnalyzer:
             for j in feature_iterator:
                 feature_vals = features_scaled[:, j]
 
-                # Spearman correlation (robust to non-normality)
-                try:
-                    r_s, p_s = spearmanr(feature_vals, attr_values, nan_policy='omit')
-                    r_s = r_s if not np.isnan(r_s) else 0.0
-                    p_s = p_s if not np.isnan(p_s) else 1.0
-                except ValueError:
+                # Check for constant arrays to avoid correlation warnings
+                if np.var(feature_vals) == 0 or np.var(attr_values) == 0:
+                    # If either array is constant, correlation is undefined
                     r_s, p_s = 0.0, 1.0
+                    dcorr = 0.0
+                else:
+                    # Spearman correlation (robust to non-normality)
+                    try:
+                        with warnings.catch_warnings():
+                            warnings.filterwarnings("ignore", message="An input array is constant")
+                            r_s, p_s = spearmanr(feature_vals, attr_values, nan_policy='omit')
+                            r_s = r_s if not np.isnan(r_s) else 0.0
+                            p_s = p_s if not np.isnan(p_s) else 1.0
+                    except (ValueError, RuntimeWarning):
+                        r_s, p_s = 0.0, 1.0
 
-                # Distance correlation
-                dcorr = self.distance_correlation(feature_vals, attr_values)
+                    # Distance correlation
+                    dcorr = self.distance_correlation(feature_vals, attr_values)
 
                 attr_results.append({
                     'feature_idx': j,
@@ -520,14 +529,29 @@ class FeatureAttributionAnalyzer:
                                           desc="Regression probes",
                                           leave=False):
             try:
-                reg = Ridge(random_state=self.random_state)
+                # Use stronger regularization for high-dimensional data
+                # Alpha should scale with n_features/n_samples ratio
+                n_samples, n_features = features_scaled.shape
+                alpha = max(1.0, n_features / n_samples)  # Adaptive regularization
+
+                reg = Ridge(alpha=alpha, random_state=self.random_state)
                 cv = KFold(n_splits=self.cv_folds, shuffle=True, random_state=self.random_state)
-                scores = cross_val_score(reg, features_scaled, attr_values, cv=cv, scoring='r2')
+
+                # Use neg_mean_squared_error and convert to R² manually to avoid numerical issues
+                mse_scores = cross_val_score(reg, features_scaled, attr_values, cv=cv, scoring='neg_mean_squared_error')
+
+                # Calculate R² manually: R² = 1 - MSE/Var(y)
+                y_var = np.var(attr_values)
+                if y_var > 0:
+                    r2_scores = 1 + mse_scores / y_var  # mse_scores are negative
+                    r2_scores = np.maximum(r2_scores, 0.0)  # Ensure non-negative R²
+                else:
+                    r2_scores = np.zeros(len(mse_scores))
 
                 results[attr_name] = {
-                    'r2': np.mean(scores),
-                    'r2_std': np.std(scores),
-                    'scores': scores.tolist()
+                    'r2': np.mean(r2_scores),
+                    'r2_std': np.std(r2_scores),
+                    'scores': r2_scores.tolist()
                 }
             except (ValueError, np.linalg.LinAlgError):
                 results[attr_name] = {

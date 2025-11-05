@@ -1,0 +1,41 @@
+=== SAE FEATURE-ATTRIBUTION ANALYSIS SUMMARY ===
+
+SAE Features: 5120
+Cells Analyzed: 100
+Overall Sparsity: 43.61%
+
+=== UNIVARIATE ASSOCIATIONS ===
+
+CATEGORICAL ATTRIBUTIONS:
+  cell_type: 4308/5120 significant features
+  phase: 139/5120 significant features
+  Total significant: 4447
+
+CONTINUOUS ATTRIBUTIONS:
+  S_score: 726/5120 significant features
+  G2M_score: 485/5120 significant features
+  n_counts: 702/5120 significant features
+  n_genes: 843/5120 significant features
+  pct_mito: 750/5120 significant features
+  pct_ribo: 1682/5120 significant features
+  Inflammation_Response: 1835/5120 significant features
+  Hypoxia: 1018/5120 significant features
+  Apoptosis: 796/5120 significant features
+  DNA_Repair: 873/5120 significant features
+  Oxidative_Phosphorylation: 944/5120 significant features
+  Total significant: 10654
+
+Overall significant associations: 15101
+
+=== LINEAR PROBE PERFORMANCE ===
+S_score: R² = -65.493
+G2M_score: R² = -23.679
+n_counts: R² = -116.864
+n_genes: R² = -75.644
+pct_mito: R² = -26.704
+pct_ribo: R² = -1.192
+Inflammation_Response: R² = -3.890
+Hypoxia: R² = -43.063
+Apoptosis: R² = -39.736
+DNA_Repair: R² = -50.128
+Oxidative_Phosphorylation: R² = -40.987
