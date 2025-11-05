@@ -94,11 +94,11 @@ class SparseAutoencoder(nn.Module):
 
         # Build encoder: input -> ... -> bottleneck
         encoder_layers = []
-        if n_encoder_layers == 1:
-            encoder_layers.append(nn.Linear(input_dim, hidden_dim, bias=False))
-        else:
+        encoder_layers.append(nn.Linear(input_dim, hidden_dim, bias=False))
+        encoder_layers.append(nn.ReLU())
+        if n_encoder_layers >= 1:
             # Compute intermediate dimensions (n_layers+1 elements)
-            for i in range(n_encoder_layers):
+            for i in range(n_encoder_layers-1):
                 encoder_layers.append(nn.Linear(hidden_dim, hidden_dim, bias=False))
                 if i < n_encoder_layers - 1:  # Add ReLU between layers, not after last
                     encoder_layers.append(nn.ReLU())
@@ -116,6 +116,7 @@ class SparseAutoencoder(nn.Module):
                 decoder_layers.append(nn.Linear(hidden_dim, hidden_dim, bias=False))
                 if i < n_decoder_layers - 2:  # Don't add ReLU after last layer
                     decoder_layers.append(nn.ReLU())
+        decoder_layers.append(nn.Linear(hidden_dim, input_dim, bias=False))
         self.decoder = nn.Sequential(*decoder_layers)
 
 
