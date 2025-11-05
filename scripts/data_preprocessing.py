@@ -55,6 +55,8 @@ MIN_GENES_PER_CELL = 100
 MIN_CELLS_PER_GENE = 3
 TARGET_CELLS = 250000
 
+EMBEDDING_NAME = "geneformer"
+
 # Output paths
 DATA_DIR = Path("data/processed")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -99,16 +101,16 @@ def get_expression_data(soma_joinids, census_version=CENSUS_VERSION):
     # Create obs filter for the specific soma_joinids
     # Convert to sorted list for better performance
     sorted_joinids = sorted(list(soma_joinids))
-    joinid_filter = f"soma_joinid in {sorted_joinids}"
 
     with cellxgene_census.open_soma(census_version=census_version) as census:
         adata = cellxgene_census.get_anndata(
             census,
             organism=ORGANISM,
             measurement_name=MEASUREMENT,
-            obs_value_filter=joinid_filter,
-            var_value_filter="feature_id != ''",  # Get all genes
-            column_names=METADATA_FIELDS  # Include metadata columns
+            obs_coords=sorted_joinids,
+            var_value_filter="feature_type=='protein_coding'",
+            obs_column_names=METADATA_FIELDS,  # Include metadata columns,
+            obs_embeddings=[EMBEDDING_NAME]
         )
 
     logger.info(f"Retrieved expression data: {adata.shape[0]} cells x {adata.shape[1]} genes")
