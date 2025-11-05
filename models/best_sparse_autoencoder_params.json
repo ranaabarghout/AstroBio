@@ -1,0 +1,8 @@
+{
+  "hidden_dim": 512,
+  "expanded_ratio": 10.0,
+  "n_encoder_layers": 2,
+  "n_decoder_layers": 1,
+  "lr": 0.00017701853566940679,
+  "sparsity_weight": 0.0006659703893931954
+}
