@@ -4,7 +4,7 @@
     <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
 </a>
 
-A data science project for analyzing single-cell RNA sequencing data from the CZ CELLxGENE Census, focusing on astrobiological and neurobiological research applications.
+A data science project for analyzing single-cell RNA sequencing data from the CZ CELLxGENE Census, focusing on SC research applications.
 
 ## Features
 
