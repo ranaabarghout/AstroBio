@@ -29,6 +29,7 @@ dependencies = [
     "python-dotenv",
     "ruff",
     "scikit-learn",
+    "scikit-image",
     "tqdm",
     "more-itertools",
     "cellxgene-census",
