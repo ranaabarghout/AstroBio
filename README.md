@@ -1,4 +1,4 @@
-# 🧬 SPARCe: Sparse Representation–Attribution Correlator ✨
+# 🧬 SPARCe: Sparse Representation–Annotation Correlator ✨
 
 <a target="_blank" href="https://cookiecutter-data-science.drivendata.org/">
     <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
@@ -98,7 +98,7 @@
 - Decodes what your SAE features actually mean
 - Creates stunning visualizations that tell stories
 - Computes feature specificity scores (how picky are your features?)
-- Maps attribution leakage (where do biological signals spread?)
+- Maps annotation leakage (where do biological signals spread?)
 - **Unlock the secrets**: `uv run scripts/sae_interpretation_analysis.py --input-dir results/your_analysis`
 
 ### 📁 Data Treasures (What You'll Find in Your Digital Chest!)
